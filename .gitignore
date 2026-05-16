@@ -1,0 +1,55 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Virtualenvs / uv ---
+.venv/
+venv/
+.uv_cache/
+.python-version
+
+# --- Node / Next.js ---
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+*.tsbuildinfo
+frontend/next-env.d.ts.bak
+
+# --- Editor / OS ---
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Campaign outputs (runtime artifacts, not source) ---
+out/
+!out/.gitkeep
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Misc ---
+.cache/
+.tmp/
+tmp/
