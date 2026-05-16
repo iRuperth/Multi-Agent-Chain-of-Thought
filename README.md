@@ -9,6 +9,18 @@
   Turn a one-paragraph merchant pitch into a ready-to-publish promotional campaign.
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python" />
+  <img src="https://img.shields.io/badge/CrewAI-1.14-FF6B35" alt="CrewAI" />
+  <img src="https://img.shields.io/badge/LiteLLM-1.83-7C3AED" alt="LiteLLM" />
+  <img src="https://img.shields.io/badge/Ollama-qwen2.5:14b-000000?logo=ollama&logoColor=white" alt="Ollama" />
+  <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind-3-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS" />
+</p>
+
 ---
 
 ## What it is
@@ -217,8 +229,3 @@ OLLAMA_MODEL=llama3.1:8b make dev
 | `OFFERLY_WEB_PORT`     | Backend port                                        | `8000`                         |
 | `OFFERLY_WEB_RELOAD`   | uvicorn auto-reload (`1` to enable)                 | `0`                            |
 
----
-
-## Stack
-
-CrewAI · LiteLLM · Ollama · FastAPI · uvicorn · Pydantic · NumPy · Next.js 15 · React 19 · TypeScript · Tailwind CSS
