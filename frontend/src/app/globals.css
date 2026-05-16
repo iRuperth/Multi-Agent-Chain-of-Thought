@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 8rem;
+}
+
+html,
+body {
+  background: #f7f4ee;
+  color: #0b2e5c;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle paper-grain texture using two radial gradients — keeps the off-white
+   from looking flat without going overboard. */
+body {
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(11, 46, 92, 0.025), transparent 55%),
+    radial-gradient(circle at 92% 78%, rgba(31, 138, 59, 0.025), transparent 60%);
+  background-attachment: fixed;
+}
+
+button,
+a,
+[role="button"],
+.clickable {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+::selection {
+  background: rgba(11, 46, 92, 0.15);
+  color: #0b2e5c;
+}
+
+/* Focus rings — accessible without being noisy. */
+:focus-visible {
+  outline: 2px solid #1f8a3b;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
