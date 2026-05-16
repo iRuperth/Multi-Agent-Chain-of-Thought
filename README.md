@@ -1,132 +1,224 @@
-# Offerly — Multi-Agent Merchant Onboarding
+<p align="center">
+  <img src="offerly/web/static/Offerly.png" alt="Offerly" width="320" />
+</p>
 
-Multi-agent system that talks to a **merchant** who wants to launch an offer,
-helps them define it, and delivers a **campaign sheet** consistent with
-platform policies and economically viable.
+<h1 align="center">Offerly</h1>
 
-Built with **CrewAI** + **Ollama** (local LLM). Bilingual: English / Spanish.
+<p align="center">
+  <b>Multi-Agent Chain-of-Thought · Merchant Onboarding</b><br/>
+  Turn a one-paragraph merchant pitch into a ready-to-publish promotional campaign.
+</p>
 
-## The case
+---
 
-Today every new merchant goes through a human *Merchant Success Manager*
-who, by phone, defines:
+## What it is
 
-- Which service / product to promote
-- Discount and final price
-- Copy (title, description, terms)
-- Restrictions (slots, expiry, exclusions)
-- Margin and volume estimate
+Offerly is a **multi-agent system** that automates merchant onboarding for a deals
+platform. The merchant types a free-form description of their business and the
+offer they want to launch. Six AI agents collaborate over a shared campaign
+state and produce a complete, validated campaign sheet:
 
-It is expensive, slow and hardly scalable. Offerly automates it with six
-agents that collaborate, validate real platform policies and simulate demand
-before publishing.
+- Catches the merchant's intent and structures it.
+- Recommends a discount and price based on category benchmarks.
+- Writes the marketing copy.
+- Runs a Monte Carlo demand simulation.
+- Validates everything against platform policies.
+- Exports the final sheet to JSON and Markdown.
 
-## Architecture
+Every agent reasons explicitly with a **Chain-of-Thought** scaffold and writes
+to a single Pydantic-typed state object. Each writer agent is wrapped in a
+CrewAI `Task` with a **guardrail** that re-prompts the agent if it didn't
+persist its required fields (up to 2 retries).
 
-Six agents in a `Crew` with a directed flow:
+Stack: **CrewAI + LiteLLM + Ollama** (local LLM, default `qwen2.5:14b`) on a
+Python 3.11 backend served by **FastAPI** (Server-Sent Events for live
+progress), with a **Next.js 15 + TypeScript + Tailwind** frontend.
 
-| Agent | Role | Tools |
-|---|---|---|
-| **Interviewer** | Drives the conversation, extracts merchant intent | — |
-| **Copy Creative** | Proposes title, hook and attractive description | — |
-| **Market Analyst** | Recommends optimal discount per category / area | `category_benchmarks` |
-| **Demand Simulator** | "Rolls the dice": Monte Carlo of units sold and margin | `simulate_demand` |
-| **Policy Validator** | Checks the platform T&Cs (legality, expiries, etc.) | `validate_policies` |
-| **Archivist** | Maintains and serializes the campaign sheet | `update_campaign`, `get_campaign`, `export_campaign` |
+---
 
-Flow: `understand → propose copy → analyze market → simulate demand → validate policies → archive`.
+## How it works
 
-Every agent uses **Chain-of-Thought**: before acting it writes a `<thinking>`
-block with 7 steps (observe, gaps, options, criteria, choose, act, self-critique).
-The CoT scaffolding is localized — it runs in the active language so the
-final copy is generated in the same language.
-
-## Web platform (Next.js + FastAPI)
-
-A polished web frontend ships in `frontend/`, backed by a FastAPI server in
-`offerly/web/`. The same six agents run, and progress streams to the browser
-over Server-Sent Events.
-
-```bash
-# Terminal 1 — backend (FastAPI on :8000)
-make web
-
-# Terminal 2 — frontend (Next.js on :3000)
-make frontend-install   # first time only
-make frontend
-# open http://localhost:3000
+```
+   ┌────────────────────────┐
+   │  Merchant pitch (text) │
+   └───────────┬────────────┘
+               ▼
+   ┌────────────────────────┐
+   │ 01 · Interviewer       │  extracts merchant_name, category,
+   │    → update_campaign   │  city, goal, audience, pricing inputs
+   └───────────┬────────────┘
+               ▼
+   ┌────────────────────────┐
+   │ 02 · Market Analyst    │  decides discount, offerly_price,
+   │    → benchmarks        │  stock, voucher validity, weekly slots
+   │    → update_campaign   │
+   └───────────┬────────────┘
+               ▼
+   ┌────────────────────────┐
+   │ 03 · Copywriter        │  writes title, description, fine print
+   │    → update_campaign   │  (anchored to real merchant data)
+   └───────────┬────────────┘
+               ▼
+   ┌────────────────────────┐
+   │ 04 · Demand Simulator  │  Monte Carlo: units p10/p50/p90,
+   │    → simulate_demand   │  profit forecast, probability profitable
+   └───────────┬────────────┘
+               ▼
+   ┌────────────────────────┐
+   │ 05 · Policy Validator  │  banned terms, margin floor,
+   │    → validate_policies │  voucher window, stock cap
+   └───────────┬────────────┘
+               ▼
+   ┌────────────────────────┐
+   │ 06 · Archivist         │  campaign_<slug>.json + .md
+   │    → export_campaign   │  to ./out/
+   └────────────────────────┘
 ```
 
-The UI has:
+All six agents share a single Pydantic **Campaign** model. Guardrails verify the
+shared state after each writer agent and trigger a re-prompt if a required
+field is still empty. The frontend streams progress and tool calls live over
+Server-Sent Events.
 
-- A clean off-white interface with the **Offerly** logo centered in the navbar.
-- An **EN / ES** toggle.
-- A textarea where the merchant describes the business in free text.
-- A live **agent timeline** with the six steps — hover a step for a quick
-  tooltip, click to expand the goal, reasoning loop and tools.
-- A final **campaign sheet** rendered as cards: copy, pricing & margin, Monte
-  Carlo simulation, and the crew's summary.
-- A **demo** mode that does not require Ollama — handy to showcase the UI.
+---
 
-## Installation
+## Quickstart
 
-The environment is managed with [`uv`](https://docs.astral.sh/uv/).
+### Requirements
+
+- Python 3.11+ and [`uv`](https://docs.astral.sh/uv/)
+- Node 18+
+- [Ollama](https://ollama.com) running locally
+
+### 1. Pull the default model
 
 ```bash
-# 1. Ollama running locally with a capable model
-ollama pull llama3.1:8b
+ollama pull qwen2.5:14b
+```
 
-# 2. Create venv and install dependencies (uv reads pyproject.toml)
+### 2. Install Python dependencies
+
+```bash
 uv sync
-
-# 3. Launch the CLI (English by default)
-uv run offerly
-
-# Spanish:
-uv run offerly --lang es
-# or
-OFFERLY_LANG=es uv run offerly
 ```
 
-Optional environment variables:
-- `OLLAMA_MODEL` (default `ollama/llama3.1:8b`)
-- `OLLAMA_BASE_URL` (default `http://localhost:11434`)
-- `OFFERLY_LANG` (`en` or `es`, default `en`)
+### 3. Install frontend dependencies (first time only)
 
-## Usage
-
-```
-> I run a spa in Soho, I want to fill Tuesday and Wednesday afternoons.
+```bash
+cd frontend && npm install && cd ..
 ```
 
-The system interprets the intent, asks follow-ups, proposes copy, recommends
-a discount, simulates demand with Monte Carlo, validates policies and
-exports to `out/campaign_<slug>.json` + Markdown.
+### 4. Start everything (backend + frontend)
 
-## Structure
+```bash
+make dev
+```
+
+### 5. Open the platform
+
+```bash
+open http://localhost:3000
+```
+
+### Alternative — run pieces separately
+
+Start only the FastAPI backend (port 8000):
+
+```bash
+make web
+```
+
+Start only the Next.js frontend (port 3000):
+
+```bash
+make frontend
+```
+
+Run the legacy interactive CLI (no web UI):
+
+```bash
+make dev-cli
+```
+
+Smoke-test the pure-logic tools (no LLM required):
+
+```bash
+make smoke
+```
+
+### Override the model
+
+```bash
+OLLAMA_MODEL=llama3.1:8b make dev
+```
+
+---
+
+## Project structure
 
 ```
-offerly/
-  cli.py                # conversational loop + --lang flag
-  crew.py               # crew assembly
-  agents.py             # the 6 agents (built per locale)
-  tasks.py              # tasks per turn (built per locale)
-  reasoning.py          # CoT wrappers
-  i18n/
-    __init__.py         # locale selector
-    en.py               # English bundle (prompts, CLI, MD labels, banned lists)
-    es.py               # Spanish bundle
-  tools/
-    demand.py           # Monte Carlo simulation
-    policies.py         # T&Cs validator (uses bundle for messages + bans)
-    benchmarks.py       # per-category benchmarks
-    campaign.py         # campaign state (carries active lang)
-  domain/
-    policies.py         # numeric thresholds (single source of truth)
-    categories.py       # categories and benchmarks
-    campaign.py         # campaign sheet model (pydantic)
-docs/
-  POLICIES.md           # human-readable policies
-out/
-  campaign_*.json
+.
+├── Makefile                       # dev / web / frontend / dev-cli / smoke
+├── pyproject.toml                 # python deps via uv
+├── offerly/                       # Python package
+│   ├── cli.py                     # legacy conversational CLI
+│   ├── crew.py                    # crew assembly entrypoint
+│   ├── agents.py                  # 6 CrewAI agents + LiteLLM routing
+│   ├── tasks.py                   # tasks + guardrails + retries
+│   ├── reasoning.py               # CoT helper wrappers
+│   ├── domain/
+│   │   ├── campaign.py            # Pydantic Campaign model
+│   │   ├── categories.py          # category benchmarks
+│   │   └── policies.py            # numeric platform thresholds
+│   ├── tools/
+│   │   ├── campaign.py            # update_/get_/export_campaign
+│   │   ├── benchmarks.py          # category_benchmarks tool
+│   │   ├── demand.py              # Monte Carlo simulator
+│   │   └── policies.py            # validate_policies tool
+│   ├── i18n/                      # EN + ES bundles
+│   └── web/                       # FastAPI app
+│       ├── app.py                 # endpoints + CORS + static
+│       ├── jobs.py                # job registry + SSE format
+│       ├── runner.py              # orchestrator + context wiring + fd capture
+│       └── static/Offerly.png
+├── frontend/                      # Next.js 15 + TS + Tailwind
+│   └── src/
+│       ├── app/{layout,page}.tsx
+│       ├── components/*.tsx       # Navbar, Landing, PromptCard,
+│       │                          # AgentTimeline, ResultPanel,
+│       │                          # Console, HowItWorks, Pricing,
+│       │                          # ApiSection, Contact, Footer …
+│       └── lib/                   # i18n, types, format, useOnboarding
+└── out/                           # campaign exports (gitignored)
 ```
+
+---
+
+## API endpoints
+
+| Method | Path                       | Purpose |
+|--------|----------------------------|---------|
+| POST   | `/api/onboard`             | Create a new onboarding job. |
+| GET    | `/api/stream/{job_id}`     | Server-Sent Events stream of progress + live logs. |
+| GET    | `/api/job/{job_id}`        | Final snapshot once the run is done. |
+| GET    | `/healthz`                 | Liveness probe. |
+| GET    | `/docs`                    | Swagger UI generated by FastAPI. |
+
+---
+
+## Environment variables
+
+| Variable               | Purpose                                             | Default                        |
+|------------------------|-----------------------------------------------------|--------------------------------|
+| `OLLAMA_MODEL`         | Model name (no prefix, runner adds `ollama_chat/`)  | `qwen2.5:14b`                  |
+| `OLLAMA_BASE_URL`      | Ollama HTTP endpoint                                | `http://localhost:11434`       |
+| `OFFERLY_LANG`         | Default language (`en` or `es`)                     | `en`                           |
+| `OFFERLY_WEB_HOST`     | Backend host                                        | `127.0.0.1`                    |
+| `OFFERLY_WEB_PORT`     | Backend port                                        | `8000`                         |
+| `OFFERLY_WEB_RELOAD`   | uvicorn auto-reload (`1` to enable)                 | `0`                            |
+
+---
+
+## Stack
+
+CrewAI · LiteLLM · Ollama · FastAPI · uvicorn · Pydantic · NumPy · Next.js 15 · React 19 · TypeScript · Tailwind CSS
