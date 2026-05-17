@@ -1,0 +1,82 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: offerly-ollama
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: offerly-backend:latest
+    container_name: offerly-backend
+    environment:
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OFFERLY_WEB_HOST: 0.0.0.0
+      OFFERLY_WEB_PORT: "8000"
+      OFFERLY_LANG: ${OFFERLY_LANG:-en}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./out:/app/out
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2).status==200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: http://backend:8000
+    image: offerly-frontend:latest
+    container_name: offerly-frontend
+    environment:
+      NODE_ENV: production
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  # One-shot helper: `docker compose --profile pull up ollama-pull`
+  # Pulls the configured Ollama model into the shared volume.
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: offerly-ollama-pull
+    profiles: ["pull"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:14b}
+    entrypoint:
+      - sh
+      - -c
+      - 'echo "Pulling $$OLLAMA_MODEL ..." && ollama pull "$$OLLAMA_MODEL"'
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  ollama_data:
