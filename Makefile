@@ -23,7 +23,7 @@ web: ## Start the FastAPI backend on :8000 (with auto-reload)
 frontend: ## Start the Next.js dev server on :3000
 	cd frontend && npm run dev
 
-dev: install ## Start backend (FastAPI :8000) + frontend (Next.js :3000) together
+dev: install ## Start Ollama (if needed) + backend (FastAPI :8000) + frontend (Next.js :3000)
 	@if [ ! -d frontend/node_modules ]; then \
 		echo "==> Installing frontend deps (first run)..."; \
 		cd frontend && npm install; \
@@ -35,13 +35,41 @@ dev: install ## Start backend (FastAPI :8000) + frontend (Next.js :3000) togethe
 		kill -9 $$PIDS 2>/dev/null || true; \
 		sleep 1; \
 	fi
+	@# Ensure Ollama is reachable on :11434. If not, start it in background.
+	@if curl -s -o /dev/null -m 2 http://localhost:11434/api/tags; then \
+		echo "==> Ollama already running"; \
+	else \
+		if ! command -v ollama >/dev/null 2>&1; then \
+			echo "ERROR: Ollama is not installed. Install it from https://ollama.com and retry."; \
+			exit 1; \
+		fi; \
+		echo "==> Starting Ollama daemon in background..."; \
+		nohup ollama serve > /tmp/offerly-ollama.log 2>&1 & \
+		for i in 1 2 3 4 5 6 7 8 9 10; do \
+			sleep 1; \
+			if curl -s -o /dev/null -m 2 http://localhost:11434/api/tags; then \
+				echo "    Ollama ready (logs: /tmp/offerly-ollama.log)"; \
+				break; \
+			fi; \
+			if [ $$i -eq 10 ]; then \
+				echo "ERROR: Ollama did not start within 10s. Check /tmp/offerly-ollama.log"; \
+				exit 1; \
+			fi; \
+		done; \
+	fi
+	@# Ensure the configured model is available locally. Pull it if missing.
+	@if ! ollama list 2>/dev/null | awk 'NR>1 {print $$1}' | grep -qx "$(OLLAMA_MODEL)"; then \
+		echo "==> Model '$(OLLAMA_MODEL)' not found locally — pulling now (this may take several minutes)..."; \
+		ollama pull $(OLLAMA_MODEL); \
+	fi
 	@echo ""
 	@echo "==> Starting Offerly platform"
 	@echo "    Backend:  http://localhost:8000"
 	@echo "    Frontend: http://localhost:3000"
-	@echo "    Ctrl-C to stop both"
+	@echo "    Ollama:   http://localhost:11434 ($(OLLAMA_MODEL))"
+	@echo "    Ctrl-C to stop the platform (Ollama keeps running)"
 	@echo ""
-	@trap 'echo ""; echo "==> Shutting down..."; kill 0' INT TERM EXIT; \
+	@trap 'echo ""; echo "==> Shutting down platform..."; kill 0' INT TERM EXIT; \
 	( OFFERLY_WEB_RELOAD=1 OLLAMA_MODEL=$(OLLAMA_MODEL) uv run offerly-web 2>&1 | sed -u "s/^/[backend] /" ) & \
 	( cd frontend && npm run dev 2>&1 | sed -u "s/^/[frontend] /" ) & \
 	wait
