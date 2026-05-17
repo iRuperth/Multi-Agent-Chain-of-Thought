@@ -94,6 +94,66 @@ Server-Sent Events.
 
 ---
 
+## Screenshots
+
+<details>
+<summary><b>📸 Platform walkthrough — click to expand</b></summary>
+
+<br/>
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <a href="docs/screenshots/offerly-01.png"><img src="docs/screenshots/offerly-01.png" width="420" alt="Landing" /></a><br/>
+      <sub><b>01 · Landing</b></sub>
+    </td>
+    <td align="center" width="50%">
+      <a href="docs/screenshots/offerly-02.png"><img src="docs/screenshots/offerly-02.png" width="420" alt="How it works — For everyone" /></a><br/>
+      <sub><b>02 · How it works · For everyone</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="docs/screenshots/offerly-03.png"><img src="docs/screenshots/offerly-03.png" width="420" alt="How it works — Technical" /></a><br/>
+      <sub><b>03 · How it works · Technical</b></sub>
+    </td>
+    <td align="center">
+      <a href="docs/screenshots/offerly-04.png"><img src="docs/screenshots/offerly-04.png" width="420" alt="API & Backend" /></a><br/>
+      <sub><b>04 · API &amp; Backend</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="docs/screenshots/offerly-05.png"><img src="docs/screenshots/offerly-05.png" width="420" alt="Swagger docs" /></a><br/>
+      <sub><b>05 · Swagger docs</b></sub>
+    </td>
+    <td align="center">
+      <a href="docs/screenshots/offerly-06.png"><img src="docs/screenshots/offerly-06.png" width="420" alt="New campaign form" /></a><br/>
+      <sub><b>06 · New campaign form</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <a href="docs/screenshots/offerly-07.png"><img src="docs/screenshots/offerly-07.png" width="420" alt="Agents working" /></a><br/>
+      <sub><b>07 · Agents working (live SSE)</b></sub>
+    </td>
+    <td align="center">
+      <a href="docs/screenshots/offerly-08.png"><img src="docs/screenshots/offerly-08.png" width="420" alt="Final campaign sheet" /></a><br/>
+      <sub><b>08 · Final campaign sheet</b></sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <a href="docs/screenshots/offerly-09.png"><img src="docs/screenshots/offerly-09.png" width="860" alt="Live backend terminal streamed to the UI" /></a><br/>
+      <sub><b>09 · Live backend terminal streamed to the UI</b></sub>
+    </td>
+  </tr>
+</table>
+
+</details>
+
+---
+
 ## Quickstart
 
 ### Requirements
