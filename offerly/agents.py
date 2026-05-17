@@ -15,6 +15,7 @@ from .tools.campaign import (
 )
 from .tools.demand import SimulateDemandTool
 from .tools.policies import ValidatePoliciesTool
+from .tools.rag_policies import RetrievePolicyClausesTool
 
 
 def _llm(creative: bool = False) -> LLM:
@@ -85,7 +86,7 @@ _MAX_ITER = {
     "market_analyst":   8,   # writes 4 pricing numbers + must call benchmarks
     "copywriter":      10,   # title + description + fine_print, hardest task
     "demand_simulator": 5,   # one tool call, straightforward
-    "policy_validator": 5,   # rule-based, fast
+    "policy_validator": 7,   # retrieve clauses + validate + cite
     "archivist":        4,   # two tool calls, deterministic
 }
 
@@ -129,11 +130,13 @@ def build_agents(lang: str, creative: bool = False) -> dict[str, Agent]:
             llm,
             max_iter=_MAX_ITER["demand_simulator"],
         ),
-        # READS state to validate against policies.
+        # READS state to validate against policies. Also retrieves the
+        # relevant clauses from the indexed POLICIES.md so the verdict can
+        # cite the section that was violated.
         "policy_validator": _agent(
             specs["policy_validator"],
             lang,
-            [ValidatePoliciesTool(), get_tool],
+            [RetrievePolicyClausesTool(), ValidatePoliciesTool(), get_tool],
             llm,
             max_iter=_MAX_ITER["policy_validator"],
         ),
