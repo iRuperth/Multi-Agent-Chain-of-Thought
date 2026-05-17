@@ -45,9 +45,6 @@ frontend/next-env.d.ts.bak
 out/
 !out/.gitkeep
 
-# --- Docs build artifacts (kept out of the repo) ---
-docs/
-
 # --- Logs ---
 *.log
 logs/
