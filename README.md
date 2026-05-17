@@ -192,6 +192,55 @@ make dev
 open http://localhost:3000
 ```
 
+### Alternative — run the whole stack with Docker
+
+If you don't want to install Python, Node or Ollama on the host, the stack is
+fully dockerised. You only need **Docker Desktop** (or any engine with
+`docker compose`).
+
+```bash
+# 1. Build images + start Ollama, backend (:8000) and frontend (:3000)
+make docker-up
+
+# 2. Pull the LLM into the Ollama volume (one-time, ~9 GB for qwen2.5:14b)
+make docker-pull-model
+
+# 3. Open the platform
+open http://localhost:3000
+```
+
+Other Docker targets:
+
+```bash
+make docker-logs                       # tail logs from all services
+make docker-ps                         # status of each container
+make docker-down                       # stop stack (keep model volume)
+make docker-clean                      # stop stack AND drop the model volume
+OLLAMA_MODEL=llama3.1:8b make docker-up    # smaller / faster model
+```
+
+Pure-`docker compose` equivalents (no Make):
+
+```bash
+docker compose up -d --build                              # start
+docker compose --profile pull run --rm ollama-pull        # pull model
+docker compose logs -f                                    # logs
+docker compose down                                       # stop
+docker compose down -v                                    # stop + drop volumes
+```
+
+Port conflicts (e.g. you already have something on `:3000`)? Override with env
+vars:
+
+```bash
+FRONTEND_PORT=3001 BACKEND_PORT=8001 OLLAMA_PORT=11435 docker compose up -d
+```
+
+> **Try it without the LLM:** the platform ships with a fully-working **demo
+> mode** that replays a canned campaign. You can POST `{"demo": true}` to
+> `/api/onboard` before pulling any model and watch the full 6-agent pipeline
+> run in under 10 seconds.
+
 ### Alternative — run pieces separately
 
 Start only the FastAPI backend (port 8000):
@@ -230,7 +279,9 @@ OLLAMA_MODEL=llama3.1:8b make dev
 
 ```
 .
-├── Makefile                       # dev / web / frontend / dev-cli / smoke
+├── Makefile                       # dev / web / frontend / dev-cli / smoke / docker-*
+├── Dockerfile.backend             # uv + FastAPI image
+├── docker-compose.yml             # ollama + backend + frontend stack
 ├── pyproject.toml                 # python deps via uv
 ├── offerly/                       # Python package
 │   ├── cli.py                     # legacy conversational CLI
@@ -254,6 +305,7 @@ OLLAMA_MODEL=llama3.1:8b make dev
 │       ├── runner.py              # orchestrator + context wiring + fd capture
 │       └── static/Offerly.png
 ├── frontend/                      # Next.js 15 + TS + Tailwind
+│   ├── Dockerfile                 # multi-stage build for production image
 │   └── src/
 │       ├── app/{layout,page}.tsx
 │       ├── components/*.tsx       # Navbar, Landing, PromptCard,
