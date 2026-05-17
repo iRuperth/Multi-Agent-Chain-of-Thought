@@ -42,6 +42,13 @@ to a single Pydantic-typed state object. Each writer agent is wrapped in a
 CrewAI `Task` with a **guardrail** that re-prompts the agent if it didn't
 persist its required fields (up to 2 retries).
 
+> The CoT scaffold is wired into every agent backstory and task description
+> via [`offerly/reasoning.py`](offerly/reasoning.py) and the i18n bundles —
+> it ships with an empty suffix by default, but can be activated by filling
+> `COT_BACKSTORY_SUFFIX` in [`offerly/i18n/en.py`](offerly/i18n/en.py) /
+> [`es.py`](offerly/i18n/es.py) to inject explicit step-by-step reasoning
+> into every agent.
+
 Stack: **CrewAI + LiteLLM + Ollama** (local LLM, default `qwen2.5:14b`) on a
 Python 3.11 backend served by **FastAPI** (Server-Sent Events for live
 progress), with a **Next.js 15 + TypeScript + Tailwind** frontend.
