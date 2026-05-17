@@ -3,7 +3,8 @@
 OLLAMA_MODEL ?= qwen2.5:14b
 OFFERLY_LANG ?= en
 
-.PHONY: help install dev dev-cli run smoke clean ollama-pull web frontend frontend-install
+.PHONY: help install dev dev-cli run smoke clean ollama-pull web frontend frontend-install \
+        docker-build docker-up docker-down docker-logs docker-pull-model docker-ps docker-clean
 
 help: ## List available targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -94,3 +95,38 @@ print(ExportCampaignTool()._run(out_dir='out'))"
 clean: ## Remove venv, build artifacts, node_modules
 	rm -rf .venv out __pycache__ .uv_cache frontend/node_modules frontend/.next
 	find . -name "__pycache__" -type d -exec rm -rf {} +
+
+# ---------------------------------------------------------------------------
+# Docker — full stack (Ollama + backend + frontend) with one command.
+# ---------------------------------------------------------------------------
+
+docker-build: ## Build the backend + frontend images
+	OLLAMA_MODEL=$(OLLAMA_MODEL) docker compose build
+
+docker-up: ## Start the full stack (Ollama + backend :8000 + frontend :3000)
+	@echo "==> Starting Offerly stack via Docker Compose"
+	@echo "    Backend:  http://localhost:8000"
+	@echo "    Frontend: http://localhost:3000"
+	@echo "    Ollama:   http://localhost:11434 ($(OLLAMA_MODEL))"
+	@echo ""
+	@echo "    First run? Pull the model afterwards:  make docker-pull-model"
+	@echo ""
+	OLLAMA_MODEL=$(OLLAMA_MODEL) docker compose up -d --build
+	@echo ""
+	@echo "==> Stack is up. Tail logs with:  make docker-logs"
+
+docker-pull-model: ## Download the configured Ollama model into the stack volume
+	@echo "==> Pulling $(OLLAMA_MODEL) into the ollama_data volume (this can take a while)"
+	OLLAMA_MODEL=$(OLLAMA_MODEL) docker compose --profile pull run --rm ollama-pull
+
+docker-logs: ## Tail logs from all services
+	docker compose logs -f --tail=100
+
+docker-ps: ## Show the status of every service
+	docker compose ps
+
+docker-down: ## Stop the stack (keep volumes + images)
+	docker compose down
+
+docker-clean: ## Stop the stack AND drop the Ollama model volume (frees disk)
+	docker compose down -v
