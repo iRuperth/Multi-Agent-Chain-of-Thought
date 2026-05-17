@@ -4,7 +4,8 @@ OLLAMA_MODEL ?= qwen2.5:14b
 OFFERLY_LANG ?= en
 
 .PHONY: help install dev dev-cli run smoke clean ollama-pull web frontend frontend-install \
-        docker-build docker-up docker-down docker-logs docker-pull-model docker-ps docker-clean
+        rag-index test \
+        docker-build docker-up docker-down docker-logs docker-pull-model docker-rag-index docker-ps docker-clean
 
 help: ## List available targets
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -82,6 +83,12 @@ dev-cli: install ## Start the legacy conversational CLI (no web UI)
 run: ## Shortcut: launch the CLI without reinstalling
 	OLLAMA_MODEL=ollama/$(OLLAMA_MODEL) OFFERLY_LANG=$(OFFERLY_LANG) uv run offerly
 
+rag-index: ## Build the policy vector index (one-time / after editing docs/POLICIES.md)
+	uv run python -m offerly.rag.ingest
+
+test: ## End-to-end self-test of the whole platform (domain, tools, web, demo, agents, RAG)
+	uv run python scripts/selftest.py
+
 smoke: ## Smoke test of pure logic (no LLM)
 	uv run python -c "from offerly.tools.campaign import UpdateCampaignTool, ExportCampaignTool, current, reset; \
 from offerly.tools.demand import SimulateDemandTool; \
@@ -115,9 +122,12 @@ docker-up: ## Start the full stack (Ollama + backend :8000 + frontend :3000)
 	@echo ""
 	@echo "==> Stack is up. Tail logs with:  make docker-logs"
 
-docker-pull-model: ## Download the configured Ollama model into the stack volume
-	@echo "==> Pulling $(OLLAMA_MODEL) into the ollama_data volume (this can take a while)"
+docker-pull-model: ## Download the configured chat + embedding models into the stack volume
+	@echo "==> Pulling $(OLLAMA_MODEL) + nomic-embed-text into the ollama_data volume (this can take a while)"
 	OLLAMA_MODEL=$(OLLAMA_MODEL) docker compose --profile pull run --rm ollama-pull
+
+docker-rag-index: ## Build the policy vector index inside the docker stack
+	OLLAMA_MODEL=$(OLLAMA_MODEL) docker compose --profile rag run --rm rag-index
 
 docker-logs: ## Tail logs from all services
 	docker compose logs -f --tail=100

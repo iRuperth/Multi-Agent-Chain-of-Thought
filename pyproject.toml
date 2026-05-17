@@ -11,6 +11,7 @@ dependencies = [
     "langchain-ollama>=0.2.0",
     "rich>=13.7",
     "fastapi[standard]>=0.115.0",
+    "chromadb>=0.5",
 ]
 
 [project.scripts]
