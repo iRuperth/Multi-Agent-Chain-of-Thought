@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1.7
+FROM python:3.11-slim-bookworm
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock README.md ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --no-dev
+
+COPY offerly ./offerly
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+ENV OFFERLY_WEB_HOST=0.0.0.0 \
+    OFFERLY_WEB_PORT=8000 \
+    OLLAMA_BASE_URL=http://ollama:11434 \
+    OLLAMA_MODEL=qwen2.5:14b \
+    OFFERLY_LANG=en \
+    PATH=/app/.venv/bin:$PATH
+
+EXPOSE 8000
+
+CMD ["uv", "run", "offerly-web"]
