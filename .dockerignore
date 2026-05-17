@@ -1,0 +1,31 @@
+.git
+.gitignore
+.venv
+.uv_cache
+__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.vscode
+.idea
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Frontend artifacts (frontend has its own build context)
+frontend/node_modules
+frontend/.next
+frontend/out
+
+# Runtime artifacts
+out/
+docs/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
