@@ -174,11 +174,17 @@ def task_simulate() -> tuple[str, str]:
 
 def task_validate() -> tuple[str, str]:
     description = (
-        "Call validate_policies. If ok=true, state that the campaign is "
-        "publishable. If ok=false, list the errors as-is and suggest a "
-        "concrete fix for each one. Do not fix them yourself: only report."
+        "First call retrieve_policy_clauses with a short query summarising "
+        "the campaign (category, headline angle, anything regulated). Then "
+        "call validate_policies. If ok=true, state that the campaign is "
+        "publishable. If ok=false, list the errors as-is, suggest a concrete "
+        "fix for each one, and cite the matching clause's section_title "
+        "from the retrieved policy text. Do not fix them yourself: only report."
     )
-    expected = "Verdict (ok/no) + list of errors and warnings + suggestions."
+    expected = (
+        "Verdict (ok/no) + list of errors and warnings + suggestions, "
+        "each error citing the policy section_title it violates."
+    )
     return description, expected
 
 

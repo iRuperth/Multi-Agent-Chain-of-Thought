@@ -15,6 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
 COPY offerly ./offerly
+COPY docs ./docs
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
@@ -22,6 +23,8 @@ ENV OFFERLY_WEB_HOST=0.0.0.0 \
     OFFERLY_WEB_PORT=8000 \
     OLLAMA_BASE_URL=http://ollama:11434 \
     OLLAMA_MODEL=qwen2.5:14b \
+    OLLAMA_EMBED_MODEL=nomic-embed-text \
+    OFFERLY_RAG_DIR=/app/.rag/chroma \
     OFFERLY_LANG=en \
     PATH=/app/.venv/bin:$PATH
 

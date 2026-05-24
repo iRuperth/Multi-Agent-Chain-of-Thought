@@ -31,6 +31,56 @@ def _get_path(state: dict, path: str) -> Any:
     return cursor
 
 
+def _rescue_from_final_answer(task_output: Any) -> bool:
+    """Salvage a Final Answer that contains the patch JSON instead of a
+    tool call. Small LLMs (qwen2.5 14B etc.) sometimes describe the call
+    as ``update_campaign({"patch_json": "..."})`` in their Final Answer
+    or emit the bare patch dict. We extract the largest balanced JSON
+    object from the text and push it through update_campaign so the
+    shared state actually gets written. Returns True if any patch was
+    successfully applied."""
+    text = getattr(task_output, "raw", None) or str(task_output or "")
+    if not text or "{" not in text:
+        return False
+
+    update_tool = campaign_tool.UpdateCampaignTool()
+    applied = False
+
+    # Walk the string and yield every balanced {...} block, INCLUDING
+    # nested ones. Small LLMs often emit ``update_campaign({"patch_json":
+    # "{...}"})`` with the inner JSON's quotes left unescaped, so the
+    # outer object fails to parse and only the inner block is valid.
+    candidates: list[str] = []
+    stack: list[int] = []
+    for i, ch in enumerate(text):
+        if ch == "{":
+            stack.append(i)
+        elif ch == "}" and stack:
+            opener = stack.pop()
+            candidates.append(text[opener : i + 1])
+
+    candidates.sort(key=len, reverse=True)
+    for blob in candidates:
+        parsed = campaign_tool._tolerant_json_load(blob)
+        if not isinstance(parsed, dict):
+            continue
+        # Unwrap {"patch_json": "..."} or {"patch_json": {...}} wrappers.
+        if set(parsed.keys()) == {"patch_json"}:
+            inner = parsed["patch_json"]
+            if isinstance(inner, str):
+                inner_parsed = campaign_tool._tolerant_json_load(inner)
+                if isinstance(inner_parsed, dict):
+                    parsed = inner_parsed
+            elif isinstance(inner, dict):
+                parsed = inner
+        if not parsed:
+            continue
+        result = update_tool._run(patch_json=parsed)
+        if not result.startswith("ERROR"):
+            applied = True
+    return applied
+
+
 def _make_guardrail(agent_key: str) -> Callable:
     """Build a guardrail callable for the given agent.
 
@@ -50,12 +100,19 @@ def _make_guardrail(agent_key: str) -> Callable:
     required = EXPECTED_AFTER.get(agent_key, [])
 
     def guard(task_output):
+        def _missing(snap: dict) -> list[str]:
+            out: list[str] = []
+            for path in required:
+                v = _get_path(snap, path)
+                if v in (None, "", []):
+                    out.append(path)
+            return out
+
         snap = campaign_tool.current().model_dump()
-        missing: list[str] = []
-        for path in required:
-            v = _get_path(snap, path)
-            if v in (None, "", []):
-                missing.append(path)
+        missing = _missing(snap)
+        if missing and _rescue_from_final_answer(task_output):
+            snap = campaign_tool.current().model_dump()
+            missing = _missing(snap)
         if missing:
             feedback = (
                 "You did not call update_campaign properly. The shared "

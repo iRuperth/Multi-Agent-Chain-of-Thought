@@ -45,6 +45,9 @@ frontend/next-env.d.ts.bak
 out/
 !out/.gitkeep
 
+# --- RAG persistent vector store (rebuild with `make rag-index`) ---
+.rag/
+
 # --- Logs ---
 *.log
 logs/

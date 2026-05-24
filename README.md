@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/CrewAI-1.14-FF6B35" alt="CrewAI" />
   <img src="https://img.shields.io/badge/LiteLLM-1.83-7C3AED" alt="LiteLLM" />
   <img src="https://img.shields.io/badge/Ollama-qwen2.5:14b-000000?logo=ollama&logoColor=white" alt="Ollama" />
+  <img src="https://img.shields.io/badge/ChromaDB-RAG-FF6B6B" alt="ChromaDB" />
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white" alt="Next.js" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React" />
@@ -41,6 +42,13 @@ Every agent reasons explicitly with a **Chain-of-Thought** scaffold and writes
 to a single Pydantic-typed state object. Each writer agent is wrapped in a
 CrewAI `Task` with a **guardrail** that re-prompts the agent if it didn't
 persist its required fields (up to 2 retries).
+
+> The CoT scaffold is wired into every agent backstory and task description
+> via [`offerly/reasoning.py`](offerly/reasoning.py) and the i18n bundles —
+> it ships with an empty suffix by default, but can be activated by filling
+> `COT_BACKSTORY_SUFFIX` in [`offerly/i18n/en.py`](offerly/i18n/en.py) /
+> [`es.py`](offerly/i18n/es.py) to inject explicit step-by-step reasoning
+> into every agent.
 
 Stack: **CrewAI + LiteLLM + Ollama** (local LLM, default `qwen2.5:14b`) on a
 Python 3.11 backend served by **FastAPI** (Server-Sent Events for live
@@ -91,6 +99,25 @@ All six agents share a single Pydantic **Campaign** model. Guardrails verify the
 shared state after each writer agent and trigger a re-prompt if a required
 field is still empty. The frontend streams progress and tool calls live over
 Server-Sent Events.
+
+### RAG · Policy Validator
+
+The **Policy Validator** is augmented with **Retrieval-Augmented Generation**
+over [`docs/POLICIES.md`](docs/POLICIES.md). Before emitting its verdict, the
+agent retrieves the most relevant clauses from a local **ChromaDB** index
+embedded with **Ollama** (`nomic-embed-text`), then **cites the section it
+applied** in the explanation. The deterministic `validate_policies` tool still
+owns the numeric verdict — RAG only adds the narrative context. Build the
+index once with:
+
+```bash
+ollama pull nomic-embed-text   # one-time, ~270 MB
+make rag-index                 # chunks docs/POLICIES.md → .rag/chroma/
+make test                      # end-to-end self-test of the RAG layer
+```
+
+Inside the Docker stack: `make docker-pull-model` (now pulls both the chat and
+the embedding model) followed by `make docker-rag-index`.
 
 ---
 
@@ -162,10 +189,11 @@ Server-Sent Events.
 - Node 18+
 - [Ollama](https://ollama.com) running locally
 
-### 1. Pull the default model
+### 1. Pull the default models
 
 ```bash
-ollama pull qwen2.5:14b
+ollama pull qwen2.5:14b          # chat model (~9 GB)
+ollama pull nomic-embed-text     # embedding model used by RAG (~270 MB)
 ```
 
 ### 2. Install Python dependencies
@@ -180,13 +208,19 @@ uv sync
 cd frontend && npm install && cd ..
 ```
 
-### 4. Start everything (backend + frontend)
+### 4. Build the RAG policy index (one-time)
+
+```bash
+make rag-index
+```
+
+### 5. Start everything (backend + frontend)
 
 ```bash
 make dev
 ```
 
-### 5. Open the platform
+### 6. Open the platform
 
 ```bash
 open http://localhost:3000
@@ -202,10 +236,13 @@ fully dockerised. You only need **Docker Desktop** (or any engine with
 # 1. Build images + start Ollama, backend (:8000) and frontend (:3000)
 make docker-up
 
-# 2. Pull the LLM into the Ollama volume (one-time, ~9 GB for qwen2.5:14b)
+# 2. Pull the chat + embedding models into the Ollama volume (one-time)
 make docker-pull-model
 
-# 3. Open the platform
+# 3. Build the RAG policy index inside the stack (one-time)
+make docker-rag-index
+
+# 4. Open the platform
 open http://localhost:3000
 ```
 
@@ -267,6 +304,14 @@ Smoke-test the pure-logic tools (no LLM required):
 make smoke
 ```
 
+End-to-end self-test of the **whole platform** (domain, tools, web layer,
+demo mode, agent wiring and RAG retrieval) — runs in ~2 s, requires Ollama
+for the RAG section:
+
+```bash
+make test
+```
+
 ### Override the model
 
 ```bash
@@ -279,10 +324,15 @@ OLLAMA_MODEL=llama3.1:8b make dev
 
 ```
 .
-├── Makefile                       # dev / web / frontend / dev-cli / smoke / docker-*
+├── Makefile                       # dev / web / frontend / dev-cli / smoke / test / rag-index / docker-*
 ├── Dockerfile.backend             # uv + FastAPI image
-├── docker-compose.yml             # ollama + backend + frontend stack
-├── pyproject.toml                 # python deps via uv
+├── docker-compose.yml             # ollama + backend + frontend + rag-index stack
+├── pyproject.toml                 # python deps via uv (incl. chromadb)
+├── docs/
+│   ├── POLICIES.md                # source of truth for the RAG policy index
+│   └── screenshots/               # platform screenshots
+├── scripts/
+│   └── selftest.py                # `make test` end-to-end self-test
 ├── offerly/                       # Python package
 │   ├── cli.py                     # legacy conversational CLI
 │   ├── crew.py                    # crew assembly entrypoint
@@ -297,7 +347,12 @@ OLLAMA_MODEL=llama3.1:8b make dev
 │   │   ├── campaign.py            # update_/get_/export_campaign
 │   │   ├── benchmarks.py          # category_benchmarks tool
 │   │   ├── demand.py              # Monte Carlo simulator
-│   │   └── policies.py            # validate_policies tool
+│   │   ├── policies.py            # validate_policies tool
+│   │   └── rag_policies.py        # retrieve_policy_clauses (RAG)
+│   ├── rag/                       # RAG layer (Ollama embeddings + ChromaDB)
+│   │   ├── embeddings.py          # OllamaEmbeddingFunction
+│   │   ├── store.py               # persistent Chroma client + collection
+│   │   └── ingest.py              # `python -m offerly.rag.ingest`
 │   ├── i18n/                      # EN + ES bundles
 │   └── web/                       # FastAPI app
 │       ├── app.py                 # endpoints + CORS + static
@@ -313,6 +368,7 @@ OLLAMA_MODEL=llama3.1:8b make dev
 │       │                          # Console, HowItWorks, Pricing,
 │       │                          # ApiSection, Contact, Footer …
 │       └── lib/                   # i18n, types, format, useOnboarding
+├── .rag/                          # ChromaDB persistent index (gitignored)
 └── out/                           # campaign exports (gitignored)
 ```
 
@@ -334,8 +390,10 @@ OLLAMA_MODEL=llama3.1:8b make dev
 
 | Variable               | Purpose                                             | Default                        |
 |------------------------|-----------------------------------------------------|--------------------------------|
-| `OLLAMA_MODEL`         | Model name (no prefix, runner adds `ollama_chat/`)  | `qwen2.5:14b`                  |
+| `OLLAMA_MODEL`         | Chat model name (no prefix, runner adds `ollama_chat/`) | `qwen2.5:14b`              |
+| `OLLAMA_EMBED_MODEL`   | Embedding model used by the RAG policy index        | `nomic-embed-text`             |
 | `OLLAMA_BASE_URL`      | Ollama HTTP endpoint                                | `http://localhost:11434`       |
+| `OFFERLY_RAG_DIR`      | Where ChromaDB persists the policy index            | `.rag/chroma`                  |
 | `OFFERLY_LANG`         | Default language (`en` or `es`)                     | `en`                           |
 | `OFFERLY_WEB_HOST`     | Backend host                                        | `127.0.0.1`                    |
 | `OFFERLY_WEB_PORT`     | Backend port                                        | `8000`                         |
